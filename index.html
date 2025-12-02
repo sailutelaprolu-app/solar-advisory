@@ -636,7 +636,47 @@ function calculateAndOpenSummary() {
     chosenCum.push(chosenMonthlySaving * 12 * y);
   }
 
-  /* ------- BUILD SUMMARY HTML (NO SCRIPTS INSIDE) -------- */
+  const summaryData = {
+    chartLabels,
+    chartUnits,
+    chartTotals,
+    years,
+    recCum,
+    chosenCum,
+    recPaybackYearNum,
+    chosenPaybackYearNum,
+    nameVal,
+    serviceVal,
+    avgUnits,
+    avgBill,
+    recommendedKw,
+    chosenKw,
+    recPaybackText,
+    chosenPaybackText,
+    costPerKw,
+    totalUnits,
+    totalEnergy,
+    totalFixed,
+    totalCustomer,
+    totalDuty,
+    totalGrand,
+    recUnitsOffset,
+    chosenUnitsOffset,
+    recGross,
+    recSubsidy,
+    recNet,
+    chosenGross,
+    chosenSubsidy,
+    chosenNet,
+    recMonthlySaving,
+    chosenMonthlySaving,
+    comparisonLine,
+    loadNote,
+    loadNoteTe,
+    addrVal
+  };
+
+  /* ------- BUILD SUMMARY HTML (WITH CHART.JS & JS INLINE) -------- */
 
   const summaryHtml = `
 <!DOCTYPE html>
@@ -918,6 +958,7 @@ function calculateAndOpenSummary() {
       margin: 15mm;
     }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <div class="sheet">
@@ -1102,7 +1143,7 @@ function calculateAndOpenSummary() {
       <br/><br/>
       <strong>Solar Plant Cost:</strong> Calculations here use an indicative cost of
       <strong>₹${costPerKw.toFixed(0)} per kW</strong>. Actual cost per kW depends on make,
-      structure and site conditions. <strong>Rate per kW is negotiable between customer and vendor.</strong>
+      structure and site conditions. <strong>Rate per kW is negotiable.</strong>
       <br/><br/>
       <strong>Sanctioned Load Advisory (TGNPDCL):</strong> ${loadNote}
       <br/><br/>
@@ -1120,7 +1161,7 @@ function calculateAndOpenSummary() {
       <strong>సోలార్ రేట్ గమనిక:</strong>
       ఈ లెక్కలో పరిగణించిన స్టాండర్డ్ సోలార్ రేట్ ప్రతి kW కి సుమారు
       <strong>₹${costPerKw.toFixed(0)}</strong>. ఇది సూచన మాత్రమే;
-      <strong>ప్రతి kW రేటు వినియోగదారుడు మరియు డీలర్ మధ్య చర్చించి నిర్ణయించుకునేలా పూర్తిగా negociable.</strong>
+      <strong>ప్రతి kW రేటు నెగోషియబుల్ (చర్చించుకొని నిర్ణయించుకునే రకం).</strong>
       <br/><br/>
       <strong>అదనపు గమనిక – నెట్ మీటర్ & కాంక్రీట్:</strong><br/>
       నెట్ మీటర్ ఖర్చు (సుమారు ₹2,500/-) మరియు సోలార్ స్ట్రక్చర్ ఫౌండేషన్ కోసం అవసరమైన
@@ -1204,51 +1245,36 @@ function calculateAndOpenSummary() {
     </div>
 
   </div>
-</body>
-</html>
-  `;
 
-  const win = window.open("", "_blank");
-  win.document.open();
-  win.document.write(summaryHtml);
-  win.document.close();
-
-  /* -------- PASS DATA TO NEW WINDOW FOR CHARTS & SHARE ------- */
-
-  win.summaryData = {
-    chartLabels,
-    chartUnits,
-    chartTotals,
-    years,
-    recCum,
-    chosenCum,
-    recPaybackYearNum,
-    chosenPaybackYearNum,
-    nameVal,
-    serviceVal,
-    avgUnits,
-    avgBill,
-    recommendedKw,
-    chosenKw,
-    recPaybackText,
-    chosenPaybackText
-  };
-
-  // Load Chart.js in the new window
-  const chartScript = win.document.createElement('script');
-  chartScript.src = 'https://cdn.jsdelivr.net/npm/chart.js';
-  win.document.head.appendChild(chartScript);
-
-  // Helper script to draw charts and handle share
-  const helperScript = win.document.createElement('script');
-  helperScript.textContent = `
+  <script>
     (function() {
+      const d = ${JSON.stringify(summaryData)};
+
+      function splitPayback(cumArr, years, paybackYear) {
+        const before = [];
+        const after = [];
+        for (let i = 0; i < years.length; i++) {
+          const y = years[i];
+          if (!paybackYear) {
+            before.push(cumArr[i]);
+            after.push(null);
+          } else if (y <= paybackYear) {
+            before.push(cumArr[i]);
+            after.push(null);
+          } else {
+            before.push(null);
+            after.push(cumArr[i]);
+          }
+        }
+        return { before, after };
+      }
+
       function startCharts() {
-        if (!window.Chart || !window.summaryData) {
+        if (!window.Chart) {
           setTimeout(startCharts, 150);
           return;
         }
-        const d = window.summaryData;
+
         const labels = d.chartLabels;
         const units = d.chartUnits;
         const totals = d.chartTotals;
@@ -1256,27 +1282,8 @@ function calculateAndOpenSummary() {
         const recCum = d.recCum;
         const chosenCum = d.chosenCum;
 
-        function splitPayback(cumArr, paybackYear) {
-          const before = [];
-          const after = [];
-          for (let i = 0; i < years.length; i++) {
-            const y = years[i];
-            if (!paybackYear) {
-              before.push(cumArr[i]);
-              after.push(null);
-            } else if (y <= paybackYear) {
-              before.push(cumArr[i]);
-              after.push(null);
-            } else {
-              before.push(null);
-              after.push(cumArr[i]);
-            }
-          }
-          return { before, after };
-        }
-
-        const recSplit = splitPayback(recCum, d.recPaybackYearNum);
-        const chosenSplit = splitPayback(chosenCum, d.chosenPaybackYearNum);
+        const recSplit = splitPayback(recCum, years, d.recPaybackYearNum);
+        const chosenSplit = splitPayback(chosenCum, years, d.chosenPaybackYearNum);
 
         const ctx1 = document.getElementById('unitsChart').getContext('2d');
         const ctx2 = document.getElementById('billChart').getContext('2d');
@@ -1417,8 +1424,6 @@ function calculateAndOpenSummary() {
       }
 
       function shareSummary() {
-        const d = window.summaryData;
-        if (!d) return;
         const text =
           "Solar & Billing Summary - SRI SITA RAMA ELECTRONICS\n" +
           "Consumer: " + d.nameVal + " (" + d.serviceVal + ")\n" +
@@ -1439,8 +1444,16 @@ function calculateAndOpenSummary() {
       window.shareSummary = shareSummary;
       window.addEventListener('load', startCharts);
     })();
+  </script>
+
+</body>
+</html>
   `;
-  win.document.head.appendChild(helperScript);
+
+  const win = window.open("", "_blank");
+  win.document.open();
+  win.document.write(summaryHtml);
+  win.document.close();
 }
 
 /* --------- UPDATED SUBSIDY FUNCTION (2 kW = ₹60,000) ---------- */
