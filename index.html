@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Solar Advisor – Telangana LT Domestic</title>
+  <title>Solar Advisor – Domestic LT</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <style>
@@ -32,11 +32,31 @@
       box-shadow: 0 8px 24px rgba(255, 171, 64, 0.25);
     }
 
+    .company-header {
+      text-align: center;
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #ffcc80;
+    }
+    .company-header .name {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #bf360c;
+      letter-spacing: 0.03em;
+    }
+    .company-header .line {
+      font-size: 0.85rem;
+      color: #5d4037;
+    }
+    .company-header .line strong {
+      color: #4e342e;
+    }
+
     h1 {
       text-align: center;
       font-size: 1.5rem;
       color: #e65100;
-      margin-bottom: 4px;
+      margin: 4px 0;
     }
 
     .subtitle {
@@ -149,9 +169,17 @@
 </head>
 
 <body>
+  <!-- PAGE 1 : DATA ENTRY -->
   <div class="app-container">
 
-    <h1>Solar Advisor – Telangana</h1>
+    <!-- COMPANY HEADER -->
+    <div class="company-header">
+      <div class="name">SRI SITA RAMA ELECTRONICS</div>
+      <div class="line">MAIN ROAD, BHADRACHALAM – 507111.</div>
+      <div class="line"><strong>GST:</strong> 36BDEPK3187Q1ZW &nbsp; | &nbsp; <strong>Phone:</strong> 8639623863</div>
+    </div>
+
+    <h1>Solar Advisor</h1>
     <div class="subtitle">LT-I Domestic Consumption & Solar Recommendation</div>
 
     <!-- LANGUAGE TOGGLE -->
@@ -281,13 +309,23 @@ function formatAmount(x) {
   return "₹" + x.toFixed(2);
 }
 
+/* ------------ CUSTOMER CHARGES & DUTY HELPERS ---------- */
+function getCustomerCharges(units) {
+  if (units <= 50) return 40;
+  if (units <= 100) return 70;
+  if (units <= 200) return 90;
+  if (units <= 300) return 100;
+  if (units <= 400) return 120;
+  if (units <= 800) return 140;
+  return 160;
+}
+
 /* ------------------ UI INIT ---------------------------- */
 
 function initUI() {
   const monthCountSelect = document.getElementById("monthCount");
   const monthsGrid = document.getElementById("monthsGrid");
 
-  // Month count select
   for (let i = 1; i <= MAX_MONTHS; i++) {
     const opt = document.createElement("option");
     opt.value = i;
@@ -296,7 +334,6 @@ function initUI() {
   }
   monthCountSelect.value = "12";
 
-  // Month cards
   for (let i = 0; i < MAX_MONTHS; i++) {
     const card = document.createElement("div");
     card.className = "month-card";
@@ -321,7 +358,6 @@ function initUI() {
     monthsGrid.appendChild(card);
   }
 
-  // Show/hide cards per month count
   monthCountSelect.addEventListener("change", () => {
     const count = Number(monthCountSelect.value);
     const cards = monthsGrid.querySelectorAll(".month-card");
@@ -361,9 +397,12 @@ function calculateSingleMonthBill(units, loadKw) {
   }
 
   const fixedCharges = loadKw * FIXED_RATE_PER_KW;
-  const grandTotal = energyTotal + fixedCharges;
+  const customerCharges = getCustomerCharges(units);
+  const duty = 0.06 * energyTotal;
 
-  return { energyTotal, fixedCharges, grandTotal };
+  const grandTotal = energyTotal + fixedCharges + customerCharges + duty;
+
+  return { energyTotal, fixedCharges, customerCharges, duty, grandTotal };
 }
 
 /* ---------------- MAIN CALC ---------------------------- */
@@ -404,9 +443,15 @@ function calculateAndOpenSummary() {
   let totalUnits = 0;
   let totalEnergy = 0;
   let totalFixed = 0;
+  let totalCustomer = 0;
+  let totalDuty = 0;
   let totalGrand = 0;
   let monthsWithData = 0;
   const rows = [];
+
+  const chartLabels = [];
+  const chartUnits = [];
+  const chartTotals = [];
 
   for (let i = 1; i <= monthCount; i++) {
     const input = document.getElementById("units_" + i);
@@ -421,12 +466,19 @@ function calculateAndOpenSummary() {
     }
 
     anyMonthFilled = true;
-    const { energyTotal, fixedCharges, grandTotal } =
-      calculateSingleMonthBill(units, loadKw);
+    const {
+      energyTotal,
+      fixedCharges,
+      customerCharges,
+      duty,
+      grandTotal
+    } = calculateSingleMonthBill(units, loadKw);
 
     totalUnits += units;
     totalEnergy += energyTotal;
     totalFixed += fixedCharges;
+    totalCustomer += customerCharges;
+    totalDuty += duty;
     totalGrand += grandTotal;
     monthsWithData++;
 
@@ -435,8 +487,14 @@ function calculateAndOpenSummary() {
       units: units,
       energy: energyTotal,
       fixed: fixedCharges,
+      customer: customerCharges,
+      duty: duty,
       total: grandTotal
     });
+
+    chartLabels.push(monthNames[i - 1]);
+    chartUnits.push(units);
+    chartTotals.push(grandTotal);
   }
 
   if (!anyMonthFilled) {
@@ -447,19 +505,19 @@ function calculateAndOpenSummary() {
   const avgUnits = totalUnits / monthsWithData;
   const avgBill = totalGrand / monthsWithData;
 
-  // Consumer info
   const nameVal = document.getElementById("consumerName").value.trim() || "—";
   const serviceVal = document.getElementById("serviceNo").value.trim() || "—";
   const addrVal = document.getElementById("address").value.trim() || "—";
 
-  // Solar calculation
   const recommendedRaw = avgUnits / UNITS_PER_KW_PER_MONTH;
   const recommendedKw = recommendedRaw > 0
-    ? Math.max(1, Math.round(recommendedRaw * 2) / 2)
+    ? Math.max(1, Math.ceil(recommendedRaw))
     : 0;
 
   let chosenKw = Number(solarKwInput.value || 0);
-  if (!(chosenKw > 0) && recommendedKw > 0) {
+  if (chosenKw > 0) {
+    chosenKw = Math.ceil(chosenKw);
+  } else if (recommendedKw > 0) {
     chosenKw = recommendedKw;
   }
 
@@ -485,18 +543,19 @@ function calculateAndOpenSummary() {
   const chosenMonthlySaving = avgBill * chosenSavingFraction;
 
   let recPaybackText = "–";
+  let recPaybackYearNum = null;
   if (recMonthlySaving > 0 && recNet > 0) {
-    const years = recNet / (recMonthlySaving * 12);
-    recPaybackText = years.toFixed(1) + " years";
+    recPaybackYearNum = recNet / (recMonthlySaving * 12);
+    recPaybackText = recPaybackYearNum.toFixed(1) + " years";
   }
 
   let chosenPaybackText = "–";
+  let chosenPaybackYearNum = null;
   if (chosenMonthlySaving > 0 && chosenNet > 0) {
-    const years = chosenNet / (chosenMonthlySaving * 12);
-    chosenPaybackText = years.toFixed(1) + " years";
+    chosenPaybackYearNum = chosenNet / (chosenMonthlySaving * 12);
+    chosenPaybackText = chosenPaybackYearNum.toFixed(1) + " years";
   }
 
-  // Comparison text
   let comparisonLine = "";
   if (chosenKw === recommendedKw) {
     comparisonLine =
@@ -509,7 +568,6 @@ function calculateAndOpenSummary() {
       `You have chosen <strong>${chosenKw.toFixed(1)} kW</strong>, which is lower than the recommended <strong>${recommendedKw.toFixed(1)} kW</strong>. Monthly savings and payback will be proportionally lower.`;
   }
 
-  // Sanctioned load notes (English + Telugu)
   let loadNote = "";
   const targetKw = Math.max(chosenKw, recommendedKw);
 
@@ -542,7 +600,6 @@ function calculateAndOpenSummary() {
       `మీ ప్రస్తుత సంక్షన్ లోడ్: ${loadKw.toFixed(1)} kW; మీ సోలార్ అవసరం: ${targetKw.toFixed(1)} kW. సంక్షన్ లోడ్ తక్కువగా ఉంది, కాబట్టి ముందుగా Load Enhancement కోసం దరఖాస్తు చేయాలి.`;
   }
 
-  // Build month rows HTML
   let rowsHtml = "";
   rows.forEach(r => {
     rowsHtml += `
@@ -551,17 +608,29 @@ function calculateAndOpenSummary() {
         <td>${r.units}</td>
         <td>${r.energy.toFixed(2)}</td>
         <td>${r.fixed.toFixed(2)}</td>
+        <td>${r.customer.toFixed(2)}</td>
+        <td>${r.duty.toFixed(2)}</td>
         <td>${r.total.toFixed(2)}</td>
       </tr>`;
   });
 
-  // SUMMARY HTML PAGE
+  const years = [];
+  const recCum = [];
+  const chosenCum = [];
+  for (let y = 1; y <= 20; y++) {
+    years.push(y);
+    recCum.push(recMonthlySaving * 12 * y);
+    chosenCum.push(chosenMonthlySaving * 12 * y);
+  }
+
+  /* ------- BUILD SUMMARY HTML (NO SCRIPTS INSIDE) -------- */
+
   const summaryHtml = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Solar & Billing Summary</title>
+  <title>Solar & Billing Summary – SRI SITA RAMA ELECTRONICS</title>
   <style>
     body {
       margin: 0;
@@ -578,9 +647,30 @@ function calculateAndOpenSummary() {
       box-shadow: none;
       padding: 15mm;
     }
+
+    .company-header {
+      text-align: center;
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #ffcc80;
+    }
+    .company-header .name {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #bf360c;
+      letter-spacing: 0.03em;
+    }
+    .company-header .line {
+      font-size: 0.85rem;
+      color: #5d4037;
+    }
+    .company-header .line strong {
+      color: #4e342e;
+    }
+
     h1 {
       text-align: center;
-      margin: 0 0 4px;
+      margin: 6px 0 4px;
       font-size: 1.4rem;
       color: #e65100;
     }
@@ -636,9 +726,7 @@ function calculateAndOpenSummary() {
       color: #4e342e;
       font-weight: 700;
     }
-    th:first-child, td:first-child {
-      text-align: left;
-    }
+    th:first-child, td:first-child { text-align: left; }
 
     .totals {
       margin-top: 8px;
@@ -745,11 +833,71 @@ function calculateAndOpenSummary() {
       font-size: 0.8rem;
       cursor: pointer;
     }
+    .share-btn {
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: none;
+      background: linear-gradient(135deg, #42a5f5, #1e88e5);
+      color: white;
+      font-size: 0.8rem;
+      cursor: pointer;
+      margin-left: 6px;
+    }
+
+    .chart-section {
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .chart-box {
+      flex: 1 1 240px;
+      min-height: 200px;
+      border: 1px solid #ffe0b2;
+      border-radius: 10px;
+      padding: 6px;
+      background: #fffdf7;
+    }
+    .chart-box.full-width { flex: 1 1 100%; }
+    .chart-box canvas { width: 100%; height: 180px; }
+
+    .pdf-note {
+      text-align: center;
+      font-size: 0.75rem;
+      color: #9e9e9e;
+      margin-top: 6px;
+    }
+
+    .bank-box {
+      margin-top: 12px;
+      padding: 8px;
+      border-radius: 10px;
+      background: #e3f2fd;
+      border: 1px solid #90caf9;
+      font-size: 0.8rem;
+      color: #0d47a1;
+    }
+    .bank-box h3 {
+      margin: 0 0 4px;
+      font-size: 0.9rem;
+      color: #0d47a1;
+    }
+    .bank-cols {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .bank-col {
+      flex: 1 1 230px;
+    }
 
     @media print {
       body { background: #ffffff; }
       .sheet { box-shadow: none; border-radius: 0; margin: 0; }
       .top-actions { display: none; }
+      .pdf-note { display: none; }
+      .chart-box { page-break-inside: avoid; }
+      .bank-box { page-break-inside: avoid; }
     }
 
     @page {
@@ -761,10 +909,18 @@ function calculateAndOpenSummary() {
 <body>
   <div class="sheet">
     <div class="top-actions">
-      <button class="print-btn" onclick="window.print()">Print</button>
+      <button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
+      <button class="share-btn" onclick="shareSummary()">Share</button>
     </div>
+
+    <div class="company-header">
+      <div class="name">SRI SITA RAMA ELECTRONICS</div>
+      <div class="line">MAIN ROAD, BHADRACHALAM – 507111.</div>
+      <div class="line"><strong>GST:</strong> 36BDEPK3187Q1ZW &nbsp; | &nbsp; <strong>Phone:</strong> 8639623863</div>
+    </div>
+
     <h1>Solar & Billing Summary</h1>
-    <div class="subtitle">Based on your past consumption and Telangana LT-I domestic tariff</div>
+    <div class="subtitle">Based on your past consumption and LT-I domestic tariff</div>
 
     <div class="consumer-block">
       <div><span class="label">Consumer Name:</span> <span class="value">${nameVal}</span></div>
@@ -783,6 +939,8 @@ function calculateAndOpenSummary() {
           <th>Units</th>
           <th>Energy (₹)</th>
           <th>Fixed (₹)</th>
+          <th>Customer (₹)</th>
+          <th>Duty 6% (₹)</th>
           <th>Total (₹)</th>
         </tr>
       </thead>
@@ -805,7 +963,15 @@ function calculateAndOpenSummary() {
         <span class="value">${formatAmount(totalFixed)}</span>
       </div>
       <div class="totals-row">
-        <span class="label">Grand total (before duty/FSA)</span>
+        <span class="label">Total customer charges</span>
+        <span class="value">${formatAmount(totalCustomer)}</span>
+      </div>
+      <div class="totals-row">
+        <span class="label">Total electricity duty (6% of energy)</span>
+        <span class="value">${formatAmount(totalDuty)}</span>
+      </div>
+      <div class="totals-row">
+        <span class="label">Grand total (incl. fixed, customer & duty – before FSA/other surcharges)</span>
         <span class="value">${formatAmount(totalGrand)}</span>
       </div>
       <div class="totals-row">
@@ -815,6 +981,30 @@ function calculateAndOpenSummary() {
       <div class="totals-row">
         <span class="label">Average bill per month</span>
         <span class="value">${formatAmount(avgBill)}</span>
+      </div>
+    </div>
+
+    <h2>Graphical View – Consumption & Bill</h2>
+    <div class="chart-section">
+      <div class="chart-box">
+        <canvas id="unitsChart"></canvas>
+      </div>
+      <div class="chart-box">
+        <canvas id="billChart"></canvas>
+      </div>
+    </div>
+
+    <h2>Solar Payback Over 20 Years – Recommended</h2>
+    <div class="chart-section">
+      <div class="chart-box full-width">
+        <canvas id="paybackRecChart"></canvas>
+      </div>
+    </div>
+
+    <h2>Solar Payback Over 20 Years – Customer Chosen</h2>
+    <div class="chart-section">
+      <div class="chart-box full-width">
+        <canvas id="paybackCustChart"></canvas>
       </div>
     </div>
 
@@ -892,18 +1082,27 @@ function calculateAndOpenSummary() {
     <div class="note">
       <strong>Note (English):</strong><br/>
       Billing is based on LT-I domestic slabs and fixed charge of ₹10/kW.
-      Electricity duty, FSA and other surcharges are not included.
+      Electricity Duty @ 6% of energy charges and Customer Charges as per LT-I table are included.
+      FSA and other surcharges are not included.
       Solar generation assumed as ~120 units/month per kW. Subsidy slab:
       1 kW → ₹30,000; 2 kW → ₹50,000; 3 kW & above → ₹78,000.
       <br/><br/>
       <strong>Sanctioned Load Advisory (TGNPDCL):</strong> ${loadNote}
       <br/><br/>
+      <strong>Additional Note – Net Meter & Civil Works:</strong><br/>
+      Net meter cost (approx. ₹2,500/-) and concrete/RCC footing for the module mounting structure
+      are to be borne by the customer only; these are not included in the above solar cost figures.
+      <br/><br/>
       <strong style="color:#bf360c;">గమనిక (తెలుగు):</strong><br/>
-      బిల్లింగ్ TGNPDCL LT-I డొమెస్టిక్ స్లాబ్‌ల ప్రకారమే గణన చేయబడింది.
-      సంక్షన్ లోడ్‌కు ప్రతి kW పై ₹10 స్థిర చార్జీ పరిగణనలోకి తీసుకున్నారు.
-      విద్యుత్ చెల్లింపుల్లో Duty, FSA వంటివి ఇందులో కలుపలేదు.
+      బిల్లింగ్ LT-I డొమెస్టిక్ స్లాబ్‌ల ప్రకారం, ప్రతి kW పై ₹10 స్థిర చార్జీతో కలిపి చేయబడింది.
+      Energy పై 6% Electricity Duty మరియు Customer Charges లెక్కల్లో కలపబడ్డాయి.
+      అయితే FSA వంటి ఇతర సర్‌చార్జీలు ఇందులో లేవు.
       సోలార్ జనరేషన్ సగటుగా 1 kW = 120 యూనిట్లు / నెలగా పరిగణించారు.
       సబ్సిడీ: 1 kW → ₹30,000; 2 kW → ₹50,000; 3 kW మరియు పైగా → ₹78,000.
+      <br/><br/>
+      <strong>అదనపు గమనిక – నెట్ మీటర్ & కాంక్రీట్:</strong><br/>
+      నెట్ మీటర్ ఖర్చు (సుమారు ₹2,500/-) మరియు సోలార్ స్ట్రక్చర్ ఫౌండేషన్ కోసం అవసరమైన
+      కాంక్రీట్/RCC వ్యయం వినియోగదారుడే భరించాలి; పై సోలార్ ఖర్చులో ఇవి కలుపబడలేదు.
       <br/><br/>
       <strong>సంక్షన్ లోడ్ సూచన (TGNPDCL):</strong> ${loadNoteTe}
     </div>
@@ -934,6 +1133,54 @@ function calculateAndOpenSummary() {
       </div>
     </div>
 
+    <div class="pdf-note">
+      To download as PDF: click <strong>“Print / Save as PDF”</strong> and in the print dialog
+      choose <strong>“Destination → Save as PDF”</strong>.
+    </div>
+
+    <!-- BANK DETAILS -->
+    <div class="bank-box">
+      <h3>Loan Disbursement / Bank Details – SRI SITA RAMA ELECTRONICS</h3>
+      <div class="bank-cols">
+        <div class="bank-col">
+          <strong>EPC Contractor Name:</strong> SRI SITA RAMA ELECTRONICS<br/>
+          <strong>EPC ID:</strong> TSRE250554<br/>
+          <strong>Owner Name:</strong> Kunta Madhusudana Reddy<br/>
+          <strong>Mobile No:</strong> 8639623863<br/>
+          <strong>Email:</strong> setaramabcm@gmail.com<br/>
+          <strong>Region:</strong> TS &nbsp;&nbsp; <strong>Pin code:</strong> 507111<br/>
+          <strong>City:</strong> Bhadrachalam &nbsp; <strong>State:</strong> Telangana
+        </div>
+        <div class="bank-col">
+          <strong>Registered Address:</strong><br/>
+          13/1/14/3, Bridge Road, Bhadrachalam,<br/>
+          Opposite Swathi Tiffins,<br/>
+          Bhadradri Kothagudem.<br/><br/>
+          <strong>Bank Name:</strong> State Bank of India<br/>
+          <strong>Branch:</strong> Bhadrachalam, Charla Road Branch<br/>
+          <strong>Account No:</strong> 31089435133<br/>
+          <strong>IFSC Code:</strong> SBIN0010685
+        </div>
+      </div>
+      <div style="margin-top:6px;font-size:0.78rem;color:#0d47a1;">
+        These details can be used by banks / DISCOMs for loan disbursement and rooftop solar subsidy processing.
+      </div>
+    </div>
+
+    <div style="margin-top:18px;padding:12px;border:1px solid #bdbdbd;border-radius:8px;background:#fafafa;font-size:0.85rem;">
+      <div style="font-weight:700;color:#37474f;margin-bottom:6px;">Prepared By:</div>
+      <div style="color:#424242;">
+        SRI SITA RAMA ELECTRONICS<br/>
+        Main Road, Bhadrachalam – 507111<br/>
+        Mobile: 8639623863
+      </div>
+
+      <div style="height:18px;"></div>
+
+      <div style="font-style:italic;color:#616161;">(Authorized Signatory)</div>
+      <div style="border-bottom:1px solid #424242;width:180px;margin-top:8px;"></div>
+    </div>
+
   </div>
 </body>
 </html>
@@ -943,13 +1190,242 @@ function calculateAndOpenSummary() {
   win.document.open();
   win.document.write(summaryHtml);
   win.document.close();
+
+  /* -------- PASS DATA TO NEW WINDOW FOR CHARTS & SHARE ------- */
+
+  win.summaryData = {
+    chartLabels,
+    chartUnits,
+    chartTotals,
+    years,
+    recCum,
+    chosenCum,
+    recPaybackYearNum,
+    chosenPaybackYearNum,
+    nameVal,
+    serviceVal,
+    avgUnits,
+    avgBill,
+    recommendedKw,
+    chosenKw,
+    recPaybackText,
+    chosenPaybackText
+  };
+
+  // Load Chart.js in the new window
+  const chartScript = win.document.createElement('script');
+  chartScript.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+  win.document.head.appendChild(chartScript);
+
+  // Helper script to draw charts and handle share
+  const helperScript = win.document.createElement('script');
+  helperScript.textContent = `
+    (function() {
+      function startCharts() {
+        if (!window.Chart || !window.summaryData) {
+          setTimeout(startCharts, 150);
+          return;
+        }
+        const d = window.summaryData;
+        const labels = d.chartLabels;
+        const units = d.chartUnits;
+        const totals = d.chartTotals;
+        const years = d.years;
+        const recCum = d.recCum;
+        const chosenCum = d.chosenCum;
+
+        function splitPayback(cumArr, paybackYear) {
+          const before = [];
+          const after = [];
+          for (let i = 0; i < years.length; i++) {
+            const y = years[i];
+            if (!paybackYear) {
+              before.push(cumArr[i]);
+              after.push(null);
+            } else if (y <= paybackYear) {
+              before.push(cumArr[i]);
+              after.push(null);
+            } else {
+              before.push(null);
+              after.push(cumArr[i]);
+            }
+          }
+          return { before, after };
+        }
+
+        const recSplit = splitPayback(recCum, d.recPaybackYearNum);
+        const chosenSplit = splitPayback(chosenCum, d.chosenPaybackYearNum);
+
+        const ctx1 = document.getElementById('unitsChart').getContext('2d');
+        const ctx2 = document.getElementById('billChart').getContext('2d');
+        const ctxRec = document.getElementById('paybackRecChart').getContext('2d');
+        const ctxCust = document.getElementById('paybackCustChart').getContext('2d');
+
+        new Chart(ctx1, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Units per month',
+              data: units,
+              backgroundColor: 'rgba(66,165,245,0.7)',
+              borderColor: 'rgba(30,136,229,1)',
+              borderWidth: 1
+            }]
+          },
+          options: { responsive: true, maintainAspectRatio: false }
+        });
+
+        new Chart(ctx2, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Bill per month (₹)',
+              data: totals,
+              backgroundColor: 'rgba(255,183,77,0.8)',
+              borderColor: 'rgba(255,152,0,1)',
+              borderWidth: 1
+            }]
+          },
+          options: { responsive: true, maintainAspectRatio: false }
+        });
+
+        new Chart(ctxRec, {
+          type: 'line',
+          data: {
+            labels: years,
+            datasets: [
+              {
+                label: 'Recommended – Payback period (₹)',
+                data: recSplit.before,
+                borderColor: '#e53935',
+                backgroundColor: 'rgba(229,57,53,0.10)',
+                tension: 0.2,
+                borderWidth: 2,
+                pointRadius: 3
+              },
+              {
+                label: 'Recommended – Free power period (₹)',
+                data: recSplit.after,
+                borderColor: '#43a047',
+                backgroundColor: 'rgba(67,160,71,0.10)',
+                tension: 0.2,
+                borderWidth: 2,
+                pointRadius: 3
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              tooltip: {
+                callbacks: {
+                  label: function (ctx) {
+                    return ctx.dataset.label + ': ₹' +
+                      ctx.parsed.y.toLocaleString(undefined, { maximumFractionDigits: 0 });
+                  }
+                }
+              }
+            },
+            scales: {
+              y: {
+                ticks: {
+                  callback: function (value) {
+                    return value.toLocaleString();
+                  }
+                }
+              }
+            }
+          }
+        });
+
+        new Chart(ctxCust, {
+          type: 'line',
+          data: {
+            labels: years,
+            datasets: [
+              {
+                label: 'Customer – Payback period (₹)',
+                data: chosenSplit.before,
+                borderColor: '#fb8c00',
+                backgroundColor: 'rgba(251,140,0,0.10)',
+                tension: 0.2,
+                borderWidth: 2,
+                borderDash: [5, 5],
+                pointRadius: 3
+              },
+              {
+                label: 'Customer – Free power period (₹)',
+                data: chosenSplit.after,
+                borderColor: '#00897b',
+                backgroundColor: 'rgba(0,137,123,0.10)',
+                tension: 0.2,
+                borderWidth: 2,
+                borderDash: [5, 5],
+                pointRadius: 3
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              tooltip: {
+                callbacks: {
+                  label: function (ctx) {
+                    return ctx.dataset.label + ': ₹' +
+                      ctx.parsed.y.toLocaleString(undefined, { maximumFractionDigits: 0 });
+                  }
+                }
+              }
+            },
+            scales: {
+              y: {
+                ticks: {
+                  callback: function (value) {
+                    return value.toLocaleString();
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+
+      function shareSummary() {
+        const d = window.summaryData;
+        if (!d) return;
+        const text =
+          "Solar & Billing Summary - SRI SITA RAMA ELECTRONICS\\n" +
+          "Consumer: " + d.nameVal + " (" + d.serviceVal + ")\\n" +
+          "Average: " + d.avgUnits.toFixed(1) + " units / month, approx ₹" + d.avgBill.toFixed(2) + " per month\\n" +
+          "Recommended solar: " + d.recommendedKw.toFixed(1) + " kW (Payback: " + d.recPaybackText + ")\\n" +
+          "Customer chosen solar: " + d.chosenKw.toFixed(1) + " kW (Payback: " + d.chosenPaybackText + ")\\n" +
+          "Prepared by: SRI SITA RAMA ELECTRONICS, Bhadrachalam.";
+        if (navigator.share) {
+          navigator.share({
+            title: "Solar & Billing Summary",
+            text: text
+          }).catch(function(){});
+        } else {
+          alert("Sharing is not supported in this browser. You can use 'Print / Save as PDF' and share the PDF.");
+        }
+      }
+
+      window.shareSummary = shareSummary;
+      window.addEventListener('load', startCharts);
+    })();
+  `;
+  win.document.head.appendChild(helperScript);
 }
 
 function calculateSubsidy(plantKw) {
   if (plantKw <= 0) return 0;
   if (plantKw <= 1) return 30000;
   if (plantKw <= 2) return 50000;
-  return 78000; // 3 kW and above
+  return 78000;
 }
 </script>
 
