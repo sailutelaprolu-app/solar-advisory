@@ -222,6 +222,11 @@
         <label id="labelSolarKwInput" for="solarKwInput">Customer Solar Choice (kW)</label>
         <input id="solarKwInput" type="number" step="0.1">
       </div>
+
+      <div class="form-group">
+        <label id="labelCostPerKw" for="costPerKw">Solar Plant Cost per kW (₹)</label>
+        <input id="costPerKw" type="number" step="1000" value="65000">
+      </div>
     </div>
 
     <label id="labelMonthUnits">Enter Monthly Consumption (Units)</label>
@@ -248,6 +253,7 @@ const langTexts = {
     loadKw: "Sanctioned Load (kW)",
     monthCount: "No. of Months (1–12)",
     solarKwInput: "Customer Solar Choice (kW)",
+    costPerKw: "Solar Plant Cost per kW (₹)",
     monthUnits: "Enter Monthly Consumption (Units)",
     langLabel: "Language / భాష:"
   },
@@ -259,6 +265,7 @@ const langTexts = {
     loadKw: "సంక్షన్ లోడ్ (kW)",
     monthCount: "నెలల సంఖ్య (1–12)",
     solarKwInput: "వినియోగదారుడు ఎంచుకున్న సోలార్ పరిమాణం (kW)",
+    costPerKw: "ప్రతి kW సోలార్ ప్లాంట్ ఖర్చు (₹)",
     monthUnits: "ప్రతి నెల వినియోగించిన యూనిట్లు నమోదు చేయండి",
     langLabel: "భాష / Language:"
   }
@@ -272,6 +279,7 @@ function setLanguage(lang) {
   document.getElementById("labelLoadKw").innerText = t.loadKw;
   document.getElementById("labelMonthCount").innerText = t.monthCount;
   document.getElementById("labelSolarKwInput").innerText = t.solarKwInput;
+  document.getElementById("labelCostPerKw").innerText = t.costPerKw;
   document.getElementById("labelMonthUnits").innerText = t.monthUnits;
   document.getElementById("langLabel").innerText = t.langLabel;
 
@@ -296,7 +304,6 @@ const slabs = [
 
 const FIXED_RATE_PER_KW = 10;
 const UNITS_PER_KW_PER_MONTH = 120;
-const SOLAR_COST_PER_KW = 65000;
 const MAX_MONTHS = 12;
 
 const monthNames = [
@@ -413,6 +420,7 @@ document.getElementById("resetBtn").addEventListener("click", clearAllInputs);
 function clearAllInputs() {
   document.getElementById("loadKw").value = "";
   document.getElementById("solarKwInput").value = "";
+  document.getElementById("costPerKw").value = "65000";
   document.getElementById("consumerName").value = "";
   document.getElementById("serviceNo").value = "";
   document.getElementById("address").value = "";
@@ -427,12 +435,17 @@ function calculateAndOpenSummary() {
   const loadKwInput = document.getElementById("loadKw");
   const monthCountSelect = document.getElementById("monthCount");
   const solarKwInput = document.getElementById("solarKwInput");
+  const costPerKwInput = document.getElementById("costPerKw");
   const errorDiv = document.getElementById("error");
 
   errorDiv.textContent = "";
 
   const monthCount = Number(monthCountSelect.value);
   const loadKw = Number(loadKwInput.value || 0);
+  let costPerKw = Number(costPerKwInput.value || 65000);
+  if (!Number.isFinite(costPerKw) || costPerKw <= 0) {
+    costPerKw = 65000;
+  }
 
   if (!Number.isFinite(loadKw) || loadKw < 0) {
     errorDiv.textContent = "Please enter a valid non-negative sanctioned load (kW).";
@@ -524,11 +537,11 @@ function calculateAndOpenSummary() {
   const recUnitsOffset = recommendedKw * UNITS_PER_KW_PER_MONTH;
   const chosenUnitsOffset = chosenKw * UNITS_PER_KW_PER_MONTH;
 
-  const recGross = recommendedKw * SOLAR_COST_PER_KW;
+  const recGross = recommendedKw * costPerKw;
   const recSubsidy = calculateSubsidy(recommendedKw);
   const recNet = Math.max(0, recGross - recSubsidy);
 
-  const chosenGross = chosenKw * SOLAR_COST_PER_KW;
+  const chosenGross = chosenKw * costPerKw;
   const chosenSubsidy = calculateSubsidy(chosenKw);
   const chosenNet = Math.max(0, chosenGross - chosenSubsidy);
 
@@ -1020,7 +1033,7 @@ function calculateAndOpenSummary() {
         <span class="solar-value">${recUnitsOffset.toFixed(0)} units</span>
       </div>
       <div class="solar-row">
-        <span class="solar-label">Gross cost (@ ₹65,000 / kW):</span>
+        <span class="solar-label">Gross cost (@ ₹${costPerKw.toFixed(0)} / kW):</span>
         <span class="solar-value">${formatAmount(recGross)}</span>
       </div>
       <div class="solar-row">
@@ -1053,7 +1066,7 @@ function calculateAndOpenSummary() {
           <span class="solar-value">${chosenUnitsOffset.toFixed(0)} units</span>
         </div>
         <div class="solar-row">
-          <span class="solar-label">Gross cost (@ ₹65,000 / kW):</span>
+          <span class="solar-label">Gross cost (@ ₹${costPerKw.toFixed(0)} / kW):</span>
           <span class="solar-value">${formatAmount(chosenGross)}</span>
         </div>
         <div class="solar-row">
@@ -1085,7 +1098,11 @@ function calculateAndOpenSummary() {
       Electricity Duty @ 6% of energy charges and Customer Charges as per LT-I table are included.
       FSA and other surcharges are not included.
       Solar generation assumed as ~120 units/month per kW. Subsidy slab:
-      1 kW → ₹30,000; 2 kW → ₹50,000; 3 kW & above → ₹78,000.
+      1 kW → ₹30,000; 2 kW → ₹60,000; 3 kW & above → ₹78,000.
+      <br/><br/>
+      <strong>Solar Plant Cost:</strong> Calculations here use an indicative cost of
+      <strong>₹${costPerKw.toFixed(0)} per kW</strong>. Actual cost per kW depends on make,
+      structure and site conditions. <strong>Rate per kW is negotiable between customer and vendor.</strong>
       <br/><br/>
       <strong>Sanctioned Load Advisory (TGNPDCL):</strong> ${loadNote}
       <br/><br/>
@@ -1098,7 +1115,12 @@ function calculateAndOpenSummary() {
       Energy పై 6% Electricity Duty మరియు Customer Charges లెక్కల్లో కలపబడ్డాయి.
       అయితే FSA వంటి ఇతర సర్‌చార్జీలు ఇందులో లేవు.
       సోలార్ జనరేషన్ సగటుగా 1 kW = 120 యూనిట్లు / నెలగా పరిగణించారు.
-      సబ్సిడీ: 1 kW → ₹30,000; 2 kW → ₹50,000; 3 kW మరియు పైగా → ₹78,000.
+      సబ్సిడీ: 1 kW → ₹30,000; 2 kW → ₹60,000; 3 kW మరియు పైగా → ₹78,000.
+      <br/><br/>
+      <strong>సోలార్ రేట్ గమనిక:</strong>
+      ఈ లెక్కలో పరిగణించిన స్టాండర్డ్ సోలార్ రేట్ ప్రతి kW కి సుమారు
+      <strong>₹${costPerKw.toFixed(0)}</strong>. ఇది సూచన మాత్రమే;
+      <strong>ప్రతి kW రేటు వినియోగదారుడు మరియు డీలర్ మధ్య చర్చించి నిర్ణయించుకునేలా పూర్తిగా negociable.</strong>
       <br/><br/>
       <strong>అదనపు గమనిక – నెట్ మీటర్ & కాంక్రీట్:</strong><br/>
       నెట్ మీటర్ ఖర్చు (సుమారు ₹2,500/-) మరియు సోలార్ స్ట్రక్చర్ ఫౌండేషన్ కోసం అవసరమైన
@@ -1397,36 +1419,20 @@ function calculateAndOpenSummary() {
       function shareSummary() {
         const d = window.summaryData;
         if (!d) return;
-
         const text =
-          "Solar & Billing Summary - SRI SITA RAMA ELECTRONICS\\n" +
-          "Consumer: " + d.nameVal + " (" + d.serviceVal + ")\\n" +
-          "Average: " + d.avgUnits.toFixed(1) + " units / month, approx ₹" + d.avgBill.toFixed(2) + " per month\\n" +
-          "Recommended solar: " + d.recommendedKw.toFixed(1) + " kW (Payback: " + d.recPaybackText + ")\\n" +
-          "Customer chosen solar: " + d.chosenKw.toFixed(1) + " kW (Payback: " + d.chosenPaybackText + ")\\n" +
-          "Prepared by: SRI SITA RAMA ELECTRONICS, Bhadrachalam.\\n\\n" +
-          "For full details, please see the attached PDF / printed sheet.";
-
-        const href = window.location.href;
-        const isHttp = href.startsWith("http://") || href.startsWith("https://");
-
+          "Solar & Billing Summary - SRI SITA RAMA ELECTRONICS\n" +
+          "Consumer: " + d.nameVal + " (" + d.serviceVal + ")\n" +
+          "Average: " + d.avgUnits.toFixed(1) + " units / month, approx ₹" + d.avgBill.toFixed(2) + " per month\n" +
+          "Recommended solar: " + d.recommendedKw.toFixed(1) + " kW (Payback: " + d.recPaybackText + ")\n" +
+          "Customer chosen solar: " + d.chosenKw.toFixed(1) + " kW (Payback: " + d.chosenPaybackText + ")\n" +
+          "Prepared by: SRI SITA RAMA ELECTRONICS, Bhadrachalam.";
         if (navigator.share) {
-          const shareData = {
+          navigator.share({
             title: "Solar & Billing Summary",
             text: text
-          };
-          if (isHttp) {
-            shareData.url = href;
-          }
-
-          navigator.share(shareData).catch(function () {
-            alert("Sharing was cancelled. You can still use 'Print / Save as PDF' and share the PDF file manually.");
-          });
+          }).catch(function(){});
         } else {
-          alert(
-            "This browser can't open the system Share window.\\n\\n" +
-            "Please use the 'Print / Save as PDF' button, save the PDF, and send that PDF via WhatsApp / Email."
-          );
+          alert("Sharing is not supported in this browser. You can use 'Print / Save as PDF' and share the PDF.");
         }
       }
 
@@ -1437,10 +1443,11 @@ function calculateAndOpenSummary() {
   win.document.head.appendChild(helperScript);
 }
 
+/* --------- UPDATED SUBSIDY FUNCTION (2 kW = ₹60,000) ---------- */
 function calculateSubsidy(plantKw) {
   if (plantKw <= 0) return 0;
   if (plantKw <= 1) return 30000;
-  if (plantKw <= 2) return 50000;
+  if (plantKw <= 2) return 60000;
   return 78000;
 }
 </script>
