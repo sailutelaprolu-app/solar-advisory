@@ -1397,20 +1397,36 @@ function calculateAndOpenSummary() {
       function shareSummary() {
         const d = window.summaryData;
         if (!d) return;
+
         const text =
           "Solar & Billing Summary - SRI SITA RAMA ELECTRONICS\\n" +
           "Consumer: " + d.nameVal + " (" + d.serviceVal + ")\\n" +
           "Average: " + d.avgUnits.toFixed(1) + " units / month, approx ₹" + d.avgBill.toFixed(2) + " per month\\n" +
           "Recommended solar: " + d.recommendedKw.toFixed(1) + " kW (Payback: " + d.recPaybackText + ")\\n" +
           "Customer chosen solar: " + d.chosenKw.toFixed(1) + " kW (Payback: " + d.chosenPaybackText + ")\\n" +
-          "Prepared by: SRI SITA RAMA ELECTRONICS, Bhadrachalam.";
+          "Prepared by: SRI SITA RAMA ELECTRONICS, Bhadrachalam.\\n\\n" +
+          "For full details, please see the attached PDF / printed sheet.";
+
+        const href = window.location.href;
+        const isHttp = href.startsWith("http://") || href.startsWith("https://");
+
         if (navigator.share) {
-          navigator.share({
+          const shareData = {
             title: "Solar & Billing Summary",
             text: text
-          }).catch(function(){});
+          };
+          if (isHttp) {
+            shareData.url = href;
+          }
+
+          navigator.share(shareData).catch(function () {
+            alert("Sharing was cancelled. You can still use 'Print / Save as PDF' and share the PDF file manually.");
+          });
         } else {
-          alert("Sharing is not supported in this browser. You can use 'Print / Save as PDF' and share the PDF.");
+          alert(
+            "This browser can't open the system Share window.\\n\\n" +
+            "Please use the 'Print / Save as PDF' button, save the PDF, and send that PDF via WhatsApp / Email."
+          );
         }
       }
 
